@@ -1,6 +1,6 @@
 // TubeQueue 서비스 워커 — 앱 설치(공유 대상 등록)용. 항상 네트워크를 먼저 쓰고, 끊겼을 때만 저장본으로 화면을 띄운다.
 // skipWaiting/clients.claim 은 쓰지 않는다: 열려 있는 페이지를 탐색 도중에 가로채면 응답이 잘리는 경우가 있었다.
-const CACHE = 'tubequeue-v1';
+const CACHE = 'tubequeue-v2';
 const SHELL = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
