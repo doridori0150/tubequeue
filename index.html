@@ -703,6 +703,11 @@ const state = Object.assign({
 }, store.get(S_KEY, {}));
 if (!Array.isArray(state.queue)) state.queue = [];
 if (!Array.isArray(state.library)) state.library = [];
+{ // 깨진 항목(곡 ID 없음) 정리 — 재생 중이던 곡 위치는 유지
+  const curUid = state.queue[state.index]?.uid;
+  state.queue = state.queue.filter(x => x && typeof x.vid === 'string' && /^[\w-]{11}$/.test(x.vid));
+  state.index = state.queue.findIndex(x => x.uid === curUid);
+}
 if (!state.queue[state.index]) state.index = state.queue.length ? 0 : -1;
 // 이전 버전 데이터: kind 가 없으면 YouTube에서 가져온 목록
 state.library = state.library.filter(p => p && typeof p.id === 'string');
@@ -2285,14 +2290,16 @@ function itemsFromParams(sp) {
 }
 
 // 이미 열린 TubeQueue 탭이 있으면 그쪽으로 넘겨서 소리가 두 군데서 나지 않게 한다
+// BC_VER: 넘기는 항목 형식이 바뀌면 올린다. 배포 직후 옛 버전 탭이 열려 있으면 그 탭에는 넘기지 않는다
+const BC_VER = 2;
 const bc = 'BroadcastChannel' in window ? new BroadcastChannel('tubequeue') : null;
 const tabId = Math.random().toString(36).slice(2);
 let handingOff = false;
 if (bc) bc.addEventListener('message', e => {
   const m = e.data || {};
   if (m.to && m.to !== tabId) return;
-  if (m.type === 'ping' && !handingOff && !handedOff) bc.postMessage({ type: 'pong', from: tabId, to: m.from });
-  else if (m.type === 'add' && Array.isArray(m.items)) {
+  if (m.type === 'ping' && !handingOff && !handedOff) bc.postMessage({ type: 'pong', from: tabId, to: m.from, v: BC_VER });
+  else if (m.type === 'add' && Array.isArray(m.items) && m.v === BC_VER) {
     bc.postMessage({ type: 'ack', to: m.from });
     handleIncoming(m.items, { intent: 'enqueue', autoplay: navigator.userActivation ? navigator.userActivation.hasBeenActive : true });
   }
@@ -2306,7 +2313,7 @@ function handOff(items) {
     const on = e => {
       const m = e.data || {};
       if (m.to !== tabId) return;
-      if (m.type === 'pong' && !target) { target = m.from; bc.postMessage({ type: 'add', from: tabId, to: target, items }); }
+      if (m.type === 'pong' && m.v === BC_VER && !target) { target = m.from; bc.postMessage({ type: 'add', from: tabId, to: target, items, v: BC_VER }); }
       else if (m.type === 'ack') done(true);
     };
     bc.addEventListener('message', on);
